@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoMessage - Share Location Notes</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4cc9f0;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --success: #4bb543;
+            --danger: #e63946;
+            --warning: #ff9e00;
+            --radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            width: 100%;
+        }
+
+        header {
+            background-color: rgba(33, 37, 41, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--light);
+        }
+
+        .logo i {
+            color: var(--accent);
+        }
+
+        .auth-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--light);
+            color: var(--light);
+        }
+
+        .btn-outline:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-expand {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-expand:hover {
+            transform: scale(1.1);
+            background: var(--light);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            height: calc(100vh - 80px);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 20px;
+            position: relative;
+        }
+
+        .map-container {
+            flex: 1;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+            min-height: 400px;
+            transition: var(--transition);
+        }
+
+        .map-container.expanded {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2000;
+            border-radius: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--radius);
+        }
+
+        .map-container.expanded #map {
+            border-radius: 0;
+        }
+
+        .message-panel {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: var(--transition);
+        }
+
+        .map-container.expanded ~ .message-panel {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .message-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        textarea {
+            padding: 12px;
+            border-radius: var(--radius);
+            border: 1px solid #ddd;
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+
+        .location-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .location-info i {
+            color: var(--primary);
+        }
+
+        .messages-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .message-card {
+            background-color: white;
+            border-radius: var(--radius);
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid var(--primary);
+            animation: fadeIn 0.5s ease;
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+
+        .message-author {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .message-time {
+            color: #888;
+        }
+
+        .message-content {
+            color: var(--dark);
+            line-height: 1.4;
+        }
+
+        .no-messages {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .auth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .auth-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .auth-form {
+            background-color: white;
+            border-radius: var(--radius);
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: var(--shadow);
+            transform: translateY(-20px);
+            transition: var(--transition);
+        }
+
+        .auth-modal.active .auth-form {
+            transform: translateY(0);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .auth-title {
+            font-size: 1.5rem;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+
+        .auth-subtitle {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: var(--radius);
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+            transition: var(--transition);
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .auth-link {
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .user-name {
+            font-weight: 600;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--dark);
+            color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 3000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast i {
+            color: var(--accent);
+        }
+
+        .message-marker {
+            background-color: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            border: 2px solid var(--primary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .message-marker:hover {
+            transform: scale(1.1);
+        }
+
+        .message-marker i {
+            color: var(--primary);
+        }
+
+        .marker-popup {
+            min-width: 200px;
+        }
+
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .popup-author {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .popup-time {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .popup-content {
+            color: var(--dark);
+            line-height: 1.4;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        /* Responsive styles */
+        @media (min-width: 768px) {
+            .app-container {
+                flex-direction: row;
+            }
+
+            .map-container {
+                flex: 2;
+            }
+
+            .message-panel {
+                flex: 1;
+                max-width: 400px;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .map-container {
+                min-height: 300px;
+            }
+
+            .messages-container {
+                max-height: 200px;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .auth-buttons {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>GeoMessage</span>
+                </div>
+                <div class="auth-buttons">
+                    <button id="loginBtn" class="btn btn-outline">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Log In</span>
+                    </button>
+                    <button id="signupBtn" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Sign Up</span>
+                    </button>
+                    <div id="userInfo" class="user-info" style="display: none;">
+                        <div class="user-avatar">U</div>
+                        <div class="user-name">User</div>
+                        <button id="logoutBtn" class="btn btn-outline">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="app-container">
+                <div class="map-container" id="mapContainer">
+                    <button id="expandMap" class="btn-expand" title="Expand map">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button id="collapseMap" class="btn-expand" style="display: none;" title="Collapse map">
+                        <i class="fas fa-compress"></i>
+                    </button>
+                    <div id="map"></div>
+                </div>
+                <div class="message-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">Leave a Message</div>
+                        <div class="location-info">
+                            <i class="fas fa-location-dot"></i>
+                            <span id="locationText">Acquiring location...</span>
+                        </div>
+                    </div>
+                    <form id="messageForm" class="message-form">
+                        <div class="form-group">
+                            <label for="messageInput">Your Message (max 200 characters)</label>
+                            <textarea id="messageInput" placeholder="Share your thoughts with others in this location..." maxlength="200"></textarea>
+                            <div style="text-align: right; font-size: 0.8rem; color: #888;">
+                                <span id="charCount">0</span>/200
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Post Message</span>
+                        </button>
+                    </form>
+                    <div class="panel-header">
+                        <div class="panel-title">Recent Messages</div>
+                        <button id="refreshBtn" class="btn btn-outline" style="color: #666; border-color: #ddd;">
+                            <i class="fas fa-refresh"></i>
+                        </button>
+                    </div>
+                    <div id="messagesContainer" class="messages-container">
+                        <div class="no-messages">No messages in this area yet. Be the first to leave one!</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Auth Modals -->
+    <div id="loginModal" class="auth-modal">
+        <div class="auth-form">
+            <div class="auth-header">
+                <h2 class="auth-title">Welcome Back</h2>
+                <p class="auth-subtitle">Sign in to your account</p>
+            </div>
+            <form id="loginForm">
+                <input type="email" class="auth-input" placeholder="Email" required>
+                <input type="password" class="auth-input" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Log In</button>
+            </form>
+            <div class="auth-footer">
+                Don't have an account? <span class="auth-link" id="showSignup">Sign Up</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="signupModal" class="auth-modal">
+        <div class="auth-form">
+            <div class="auth-header">
+                <h2 class="auth-title">Create Account</h2>
+                <p class="auth-subtitle">Join the GeoMessage community</p>
+            </div>
+            <form id="signupForm">
+                <input type="text" class="auth-input" placeholder="Full Name" required>
+                <input type="email" class="auth-input" placeholder="Email" required>
+                <input type="password" class="auth-input" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Sign Up</button>
+            </form>
+            <div class="auth-footer">
+                Already have an account? <span class="auth-link" id="showLogin">Log In</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Message posted successfully!</span>
+    </div>
+
+    <!-- Firebase and Map Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            query, 
+            where, 
+            getDocs, 
+            orderBy, 
+            onSnapshot,
+            serverTimestamp,
+            Timestamp,
+            deleteDoc,
+            doc,
+            setDoc
+        } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDp91wEWCwdUOLQ94U7ZeMxHpxh46tdl4",
+            authDomain: "noteme-78081.firebaseapp.com",
+            projectId: "noteme-78081",
+            storageBucket: "noteme-78081.firebasestorage.app",
+            messagingSenderId: "405709489682",
+            appId: "1:405709489682:web:b75d51aba0f0d41c283acb"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Application state
+        let currentUser = null;
+        let userLocation = null;
+        let map = null;
+        let markers = [];
+        let messagesListener = null;
+        let isMapExpanded = false;
+
+        // DOM Elements
+        const loginBtn = document.getElementById('loginBtn');
+        const signupBtn = document.getElementById('signupBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userInfo = document.getElementById('userInfo');
+        const loginModal = document.getElementById('loginModal');
+        const signupModal = document.getElementById('signupModal');
+        const showSignup = document.getElementById('showSignup');
+        const showLogin = document.getElementById('showLogin');
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        const messageForm = document.getElementById('messageForm');
+        const messageInput = document.getElementById('messageInput');
+        const charCount = document.getElementById('charCount');
+        const locationText = document.getElementById('locationText');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toastMessage');
+        const mapContainer = document.getElementById('mapContainer');
+        const expandMapBtn = document.getElementById('expandMap');
+        const collapseMapBtn = document.getElementById('collapseMap');
+
+        // Initialize the application
+        function initApp() {
+            initMap();
+            setupEventListeners();
+            getUserLocation();
+            checkAuthState();
+            loadAllPosts(); // Load all posts initially
+        }
+
+        // Initialize the map
+        function initMap() {
+            // Default to a central location (can be updated when user location is available)
+            map = L.map('map').setView([40.7128, -74.0060], 2); // Start with world view
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            // Auth buttons
+            loginBtn.addEventListener('click', () => toggleModal(loginModal, true));
+            signupBtn.addEventListener('click', () => toggleModal(signupModal, true));
+            logoutBtn.addEventListener('click', handleLogout);
+            
+            // Modal navigation
+            showSignup.addEventListener('click', () => {
+                toggleModal(loginModal, false);
+                toggleModal(signupModal, true);
+            });
+            
+            showLogin.addEventListener('click', () => {
+                toggleModal(signupModal, false);
+                toggleModal(loginModal, true);
+            });
+            
+            // Auth forms
+            loginForm.addEventListener('submit', handleLogin);
+            signupForm.addEventListener('submit', handleSignup);
+            
+            // Message form
+            messageForm.addEventListener('submit', handleMessageSubmit);
+            messageInput.addEventListener('input', updateCharCount);
+            
+            // Refresh button
+            refreshBtn.addEventListener('click', loadAllPosts);
+            
+            // Map expand/collapse
+            expandMapBtn.addEventListener('click', expandMap);
+            collapseMapBtn.addEventListener('click', collapseMap);
+            
+            // Close modals when clicking outside
+            window.addEventListener('click', (e) => {
+                if (e.target === loginModal) toggleModal(loginModal, false);
+                if (e.target === signupModal) toggleModal(signupModal, false);
+            });
+        }
+
+        // Expand map to full screen
+        function expandMap() {
+            mapContainer.classList.add('expanded');
+            expandMapBtn.style.display = 'none';
+            collapseMapBtn.style.display = 'flex';
+            isMapExpanded = true;
+            
+            // Trigger map resize
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+
+        // Collapse map back to normal
+        function collapseMap() {
+            mapContainer.classList.remove('expanded');
+            expandMapBtn.style.display = 'flex';
+            collapseMapBtn.style.display = 'none';
+            isMapExpanded = false;
+            
+            // Trigger map resize
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+
+        // Toggle modal visibility
+        function toggleModal(modal, show) {
+            if (show) {
+                modal.classList.add('active');
+            } else {
+                modal.classList.remove('active');
+            }
+        }
+
+        // Update character count for message input
+        function updateCharCount() {
+            charCount.textContent = messageInput.value.length;
+        }
+
+        // Get user's current location
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        // Update map view to user location
+                        map.setView([userLocation.lat, userLocation.lng], 13);
+                        
+                        // Add user location marker
+                        L.marker([userLocation.lat, userLocation.lng])
+                            .addTo(map)
+                            .bindPopup('Your current location')
+                            .openPopup();
+                        
+                        // Update location text
+                        locationText.textContent = `Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)}`;
+                    },
+                    (error) => {
+                        console.error('Error getting location:', error);
+                        locationText.textContent = 'Location access denied';
+                        showToast('Please enable location access to use all features', 'warning');
+                    }
+                );
+            } else {
+                locationText.textContent = 'Geolocation not supported';
+                showToast('Your browser does not support geolocation', 'warning');
+            }
+        }
+
+        // Handle user login
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = e.target[0].value;
+            const password = e.target[1].value;
+            
+            // Show loading state
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            submitBtn.disabled = true;
+            
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                await createUserDocument(userCredential.user);
+                toggleModal(loginModal, false);
+                showToast('Successfully logged in!', 'success');
+            } catch (error) {
+                console.error('Login error:', error);
+                let errorMessage = 'Login failed. Please check your credentials.';
+                
+                if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Invalid email address.';
+                } else if (error.code === 'auth/user-disabled') {
+                    errorMessage = 'This account has been disabled.';
+                } else if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'No account found with this email.';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorMessage = 'Incorrect password.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    errorMessage = 'Too many failed attempts. Please try again later.';
+                }
+                
+                showToast(errorMessage, 'error');
+            } finally {
+                // Reset button state
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Handle user signup
+        async function handleSignup(e) {
+            e.preventDefault();
+            const name = e.target[0].value;
+            const email = e.target[1].value;
+            const password = e.target[2].value;
+            
+            // Show loading state
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+            submitBtn.disabled = true;
+            
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await createUserDocument(userCredential.user, name);
+                toggleModal(signupModal, false);
+                showToast('Account created successfully!', 'success');
+            } catch (error) {
+                console.error('Signup error:', error);
+                let errorMessage = 'Signup failed. Please try again.';
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'This email is already registered.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Invalid email address.';
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    errorMessage = 'Email/password accounts are not enabled.';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'Password is too weak. Please use a stronger password.';
+                }
+                
+                showToast(errorMessage, 'error');
+            } finally {
+                // Reset button state
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Create user document in Firestore
+        async function createUserDocument(user, name = null) {
+            try {
+                const userDoc = {
+                    email: user.email,
+                    createdAt: serverTimestamp(),
+                    lastLogin: serverTimestamp()
+                };
+                
+                if (name) {
+                    userDoc.displayName = name;
+                }
+                
+                await setDoc(doc(db, 'users', user.uid), userDoc, { merge: true });
+            } catch (error) {
+                console.error('Error creating user document:', error);
+            }
+        }
+
+        // Handle user logout
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                showToast('Successfully logged out!', 'success');
+            } catch (error) {
+                console.error('Logout error:', error);
+                showToast('Logout failed. Please try again.', 'error');
+            }
+        }
+
+        // Check authentication state
+        function checkAuthState() {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    loginBtn.style.display = 'none';
+                    signupBtn.style.display = 'none';
+                    userInfo.style.display = 'flex';
+                    document.querySelector('.user-avatar').textContent = user.email.charAt(0).toUpperCase();
+                    document.querySelector('.user-name').textContent = user.email.split('@')[0];
+                    
+                    // Update user document with last login
+                    createUserDocument(user);
+                } else {
+                    currentUser = null;
+                    loginBtn.style.display = 'flex';
+                    signupBtn.style.display = 'flex';
+                    userInfo.style.display = 'none';
+                }
+            });
+        }
+
+        // Handle message submission
+        async function handleMessageSubmit(e) {
+            e.preventDefault();
+            
+            if (!currentUser) {
+                showToast('Please log in to post a message', 'warning');
+                toggleModal(loginModal, true);
+                return;
+            }
+            
+            if (!userLocation) {
+                showToast('Unable to determine your location', 'error');
+                return;
+            }
+            
+            const message = messageInput.value.trim();
+            if (!message) {
+                showToast('Please enter a message', 'warning');
+                return;
+            }
+            
+            try {
+                // Add post to Firestore with proper data structure
+                const postData = {
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    message: message,
+                    location: new firebase.firestore.GeoPoint(userLocation.lat, userLocation.lng),
+                    timestamp: serverTimestamp(),
+                    expiresAt: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)) // 24 hours from now
+                };
+                
+                await addDoc(collection(db, 'posts'), postData);
+                
+                // Clear form
+                messageInput.value = '';
+                updateCharCount();
+                
+                showToast('Message posted successfully!', 'success');
+            } catch (error) {
+                console.error('Error posting message:', error);
+                let errorMessage = 'Failed to post message. Please try again.';
+                
+                if (error.code === 'permission-denied') {
+                    errorMessage = 'Permission denied. Please check Firestore rules.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                showToast(errorMessage, 'error');
+            }
+        }
+
+        // Load all posts from everywhere
+        function loadAllPosts() {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            const postsQuery = query(
+                collection(db, 'posts'),
+                orderBy('timestamp', 'desc')
+            );
+            
+            // Set up real-time listener
+            if (messagesListener) {
+                messagesListener();
+            }
+            
+            messagesListener = onSnapshot(postsQuery, 
+                (snapshot) => {
+                    messagesContainer.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        messagesContainer.innerHTML = '<div class="no-messages">No messages found. Be the first to post one!</div>';
+                        return;
+                    }
+                    
+                    let hasLocalMessages = false;
+                    
+                    snapshot.forEach((doc) => {
+                        const post = doc.data();
+                        // Only show messages in the messages panel if they're nearby
+                        if (userLocation && isPostNearby(post, userLocation)) {
+                            displayMessage(post);
+                            hasLocalMessages = true;
+                        }
+                        // Always add all posts to the map
+                        addMessageMarker(post);
+                    });
+                    
+                    if (!hasLocalMessages && userLocation) {
+                        messagesContainer.innerHTML = '<div class="no-messages">No messages in your area yet. Be the first to leave one!</div>';
+                    } else if (!hasLocalMessages) {
+                        messagesContainer.innerHTML = '<div class="no-messages">No messages found. Be the first to post one!</div>';
+                    }
+                },
+                (error) => {
+                    console.error('Error loading posts:', error);
+                    showToast('Error loading messages', 'error');
+                }
+            );
+        }
+
+        // Check if a post is nearby the user's location
+        function isPostNearby(post, userLoc, radiusKm = 5) {
+            const postLat = post.location.latitude;
+            const postLng = post.location.longitude;
+            
+            const R = 6371; // Earth's radius in km
+            const dLat = (postLat - userLoc.lat) * Math.PI / 180;
+            const dLng = (postLng - userLoc.lng) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(userLoc.lat * Math.PI / 180) * Math.cos(postLat * Math.PI / 180) * 
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+            
+            return distance <= radiusKm;
+        }
+
+        // Display message in the messages panel
+        function displayMessage(post) {
+            const messageCard = document.createElement('div');
+            messageCard.className = 'message-card';
+            
+            const timeAgo = getTimeAgo(post.timestamp?.toDate());
+            
+            messageCard.innerHTML = `
+                <div class="message-header">
+                    <div class="message-author">${post.userEmail?.split('@')[0] || 'Anonymous'}</div>
+                    <div class="message-time">${timeAgo}</div>
+                </div>
+                <div class="message-content">${post.message}</div>
+            `;
+            
+            messagesContainer.appendChild(messageCard);
+        }
+
+        // Add message marker to the map
+        function addMessageMarker(post) {
+            const location = post.location;
+            const marker = L.marker([location.latitude, location.longitude], {
+                icon: L.divIcon({
+                    className: 'message-marker',
+                    html: '<i class="fas fa-comment"></i>',
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 40]
+                })
+            }).addTo(map);
+            
+            marker.bindPopup(`
+                <div class="marker-popup">
+                    <div class="popup-header">
+                        <div class="popup-author">${post.userEmail?.split('@')[0] || 'Anonymous'}</div>
+                        <div class="popup-time">${getTimeAgo(post.timestamp?.toDate())}</div>
+                    </div>
+                    <div class="popup-content">${post.message}</div>
+                </div>
+            `);
+            
+            markers.push(marker);
+        }
+
+        // Calculate time ago from date
+        function getTimeAgo(date) {
+            if (!date) return 'Just now';
+            
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + ' years ago';
+            
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + ' months ago';
+            
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + ' days ago';
+            
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + ' hours ago';
+            
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + ' minutes ago';
+            
+            return 'Just now';
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            toastMessage.textContent = message;
+            
+            if (type === 'success') {
+                toast.style.backgroundColor = 'var(--success)';
+            } else if (type === 'error') {
+                toast.style.backgroundColor = 'var(--danger)';
+            } else if (type === 'warning') {
+                toast.style.backgroundColor = 'var(--warning)';
+            } else {
+                toast.style.backgroundColor = 'var(--dark)';
+            }
+            
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
